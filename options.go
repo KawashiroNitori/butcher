@@ -37,3 +37,13 @@ func BufferSize(size int) Option {
 		return nil
 	}
 }
+
+func RetryOnError(maxTimes int) Option {
+	return func(b *butcher) error {
+		if maxTimes <= 0 {
+			return fmt.Errorf("max retry times cannot be less than 0")
+		}
+		b.maxRetryTimes = maxTimes
+		return nil
+	}
+}

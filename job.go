@@ -4,7 +4,7 @@ type jobType int
 
 const (
 	jobTypeJob jobType = iota
-	jobTypeStop
+	// jobTypeStop
 )
 
 type job struct {

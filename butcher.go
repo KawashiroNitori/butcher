@@ -3,11 +3,13 @@ package butcher
 import (
 	"context"
 	"fmt"
-	"golang.org/x/time/rate"
 	"os"
 	"os/signal"
 	"sync"
+	"syscall"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 type Butcher interface {
@@ -62,8 +64,8 @@ func (b *butcher) Run() error {
 	b.rectify(ctx)
 	b.schedule(ctx)
 
-	signalCh := make(chan os.Signal)
-	signal.Notify(signalCh)
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGTSTP, syscall.SIGQUIT)
 	select {
 	case s := <-signalCh:
 		return fmt.Errorf("interrupted by signal: %v", s)

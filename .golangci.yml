@@ -1,0 +1,10 @@
+run:
+  timeout: 3m
+  tests: false
+
+issues:
+  exclude:
+    - whyNoLint
+    - use underscores in Go names
+    - make it a constant
+    - weak cryptographic primitive

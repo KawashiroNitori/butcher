@@ -25,8 +25,6 @@ type butcher struct {
 
 	limiter *rate.Limiter
 
-	stopped bool
-
 	jobCh      chan interface{}
 	readyCh    chan job
 	completeCh chan struct{}
@@ -78,7 +76,6 @@ func (b *butcher) generate(ctx context.Context) {
 	go func() {
 		_ = safelyRun(func() error {
 			err := b.executor.GenerateJob(ctx, b.jobCh)
-			b.stopped = true
 			close(b.jobCh)
 			return err
 		})
@@ -103,7 +100,13 @@ func (b *butcher) schedule(ctx context.Context) {
 			go func() {
 				defer wg.Done()
 				for j := range b.readyCh {
-					b.task(ctx, j)
+					for j.RetryTime <= b.maxRetryTimes {
+						if err := b.task(ctx, j); err != nil {
+							j.RetryTime++
+						} else {
+							break
+						}
+					}
 				}
 			}()
 		}
@@ -112,7 +115,7 @@ func (b *butcher) schedule(ctx context.Context) {
 	}()
 }
 
-func (b *butcher) task(ctx context.Context, j job) {
+func (b *butcher) task(ctx context.Context, j job) (err error) {
 	if b.taskTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, b.taskTimeout)
@@ -127,25 +130,22 @@ func (b *butcher) task(ctx context.Context, j job) {
 
 	select {
 	case <-ctx.Done():
-		b.onError(ctx, j, ctx.Err())
-	case err := <-errCh:
-		if err != nil {
-			b.onError(ctx, j, err)
-		} else {
-			b.onFinish(ctx, j)
-		}
+		err = ctx.Err()
+	case err = <-errCh:
 	}
+
+	if err != nil {
+		b.onError(ctx, j, err)
+	} else {
+		b.onFinish(ctx, j)
+	}
+	return err
 }
 
 func (b *butcher) onError(ctx context.Context, j job, err error) {
-	if j.RetryTime < b.maxRetryTimes && !b.stopped {
-		j.RetryTime++
-		b.jobCh <- j
-		return
-	}
 	if watcher, ok := b.executor.(OnErrorWatcher); ok {
 		_ = safelyRun(func() error {
-			watcher.OnError(ctx, j.Payload, err)
+			watcher.OnError(ctx, j.RetryTime, j.Payload, err)
 			return nil
 		})
 	}

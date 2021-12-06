@@ -2,6 +2,7 @@ package butcher
 
 import (
 	"fmt"
+	"time"
 
 	"golang.org/x/time/rate"
 )
@@ -18,12 +19,12 @@ func MaxWorker(count int) Option {
 	}
 }
 
-func RateLimit(rateLimit float64) Option {
+func RateLimit(tasksPerSecond float64) Option {
 	return func(b *butcher) error {
-		if rateLimit <= 0 {
+		if tasksPerSecond <= 0 {
 			return fmt.Errorf("rate cannot be less than 0")
 		}
-		b.rateLimit = rate.Limit(rateLimit)
+		b.rateLimit = rate.Limit(tasksPerSecond)
 		return nil
 	}
 }
@@ -44,6 +45,16 @@ func RetryOnError(maxTimes int) Option {
 			return fmt.Errorf("max retry times cannot be less than 0")
 		}
 		b.maxRetryTimes = maxTimes
+		return nil
+	}
+}
+
+func TaskTimeout(timeout time.Duration) Option {
+	return func(b *butcher) error {
+		if timeout <= 0 {
+			return fmt.Errorf("timeout cannot be less than 0")
+		}
+		b.taskTimeout = timeout
 		return nil
 	}
 }

@@ -13,7 +13,7 @@ import (
 )
 
 type Butcher interface {
-	Run() error
+	Run(context.Context) error
 }
 
 type butcher struct {
@@ -27,9 +27,11 @@ type butcher struct {
 
 	limiter *rate.Limiter
 
-	jobCh      chan interface{}
-	readyCh    chan job
-	completeCh chan struct{}
+	jobCh         chan interface{}
+	readyCh       chan job
+	generateErrCh chan error
+	completeCh    chan struct{}
+	signalCh      chan os.Signal
 }
 
 func NewButcher(executor Executor, opts ...Option) (Butcher, error) {
@@ -48,27 +50,36 @@ func NewButcher(executor Executor, opts ...Option) (Butcher, error) {
 		}
 	}
 
-	return b, nil
-}
-
-func (b *butcher) Run() error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	b.limiter = rate.NewLimiter(b.rateLimit, b.bufSize)
 
 	b.jobCh = make(chan interface{}, b.bufSize)
 	b.readyCh = make(chan job, b.bufSize)
-	b.completeCh = make(chan struct{})
+	b.generateErrCh = make(chan error, 1)
+	b.completeCh = make(chan struct{}, 1)
+	b.signalCh = make(chan os.Signal, 1)
+
+	return b, nil
+}
+
+func (b *butcher) Run(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	b.generate(ctx)
 	b.rectify(ctx)
 	b.schedule(ctx)
 
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGTSTP, syscall.SIGQUIT)
+	signal.Notify(b.signalCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGTSTP, syscall.SIGQUIT)
 	select {
-	case s := <-signalCh:
+	case s := <-b.signalCh:
 		return fmt.Errorf("interrupted by signal: %v", s)
+	case err := <-b.generateErrCh:
+		// waiting for scheduled jobs complete
+		<-b.completeCh
+		return fmt.Errorf("generator error occurred: %w", err)
 	case <-b.completeCh:
 		return nil
 	}
@@ -76,11 +87,14 @@ func (b *butcher) Run() error {
 
 func (b *butcher) generate(ctx context.Context) {
 	go func() {
-		_ = safelyRun(func() error {
+		err := safelyRun(func() error {
 			err := b.executor.GenerateJob(ctx, b.jobCh)
-			close(b.jobCh)
 			return err
 		})
+		if err != nil {
+			b.generateErrCh <- err
+		}
+		close(b.jobCh)
 	}()
 }
 
@@ -95,22 +109,25 @@ func (b *butcher) rectify(ctx context.Context) {
 }
 
 func (b *butcher) schedule(ctx context.Context) {
+	var wg sync.WaitGroup
+
+	runFunc := func() {
+		defer wg.Done()
+		for j := range b.readyCh {
+			for j.RetryTime <= b.maxRetryTimes {
+				if err := b.task(ctx, j); err != nil {
+					j.RetryTime++
+				} else {
+					break
+				}
+			}
+		}
+	}
+
 	go func() {
-		var wg sync.WaitGroup
 		for i := 0; i < b.maxWorker; i++ {
 			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for j := range b.readyCh {
-					for j.RetryTime <= b.maxRetryTimes {
-						if err := b.task(ctx, j); err != nil {
-							j.RetryTime++
-						} else {
-							break
-						}
-					}
-				}
-			}()
+			go runFunc()
 		}
 		wg.Wait()
 		b.completeCh <- struct{}{}

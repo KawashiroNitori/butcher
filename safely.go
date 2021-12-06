@@ -7,9 +7,9 @@ func safelyRun(f func() error) (err error) {
 		if v := recover(); v != nil {
 			if e, ok := v.(error); ok {
 				err = e
+			} else {
+				err = fmt.Errorf("unexpected panic occurred: %v", v)
 			}
-		} else {
-			err = fmt.Errorf("error occurred: %v", v)
 		}
 	}()
 

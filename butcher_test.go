@@ -2,6 +2,7 @@ package butcher
 
 import (
 	"context"
+	"fmt"
 	"syscall"
 	"testing"
 	"time"
@@ -28,18 +29,17 @@ func TestButcherBasic(t *testing.T) {
 func TestButcherRetry(t *testing.T) {
 	size := 6
 	executor := &retryExecutor{
-		T:          t,
-		Size:       size,
-		Results:    make([]int, size),
-		RetryTimes: make([]int, size),
-		Finished:   make([]bool, size),
+		Size:     size,
+		Results:  make([]int, size),
+		Finished: make([]bool, size),
+		Errors:   make([]error, size),
 	}
 	b, err := NewButcher(executor, MaxWorker(3), BufferSize(3), RetryOnError(3))
 	assert.NoError(t, err)
 	assert.NoError(t, b.Run(context.Background()))
 	assert.EqualValues(t, []int{1, 2, 3, 4, 4, 4}, executor.Results)
-	assert.EqualValues(t, []int{0, 0, 1, 2, 3, 3}, executor.RetryTimes)
 	assert.EqualValues(t, []bool{true, true, true, true, false, false}, executor.Finished)
+	assert.EqualValues(t, []error{nil, nil, nil, nil, fmt.Errorf("boom"), fmt.Errorf("boom")}, executor.Errors)
 }
 
 func TestButcherTaskTimeout(t *testing.T) {
@@ -51,7 +51,7 @@ func TestButcherTaskTimeout(t *testing.T) {
 	}
 	b, err := NewButcher(executor, MaxWorker(5), BufferSize(5), TaskTimeout(250*time.Millisecond))
 	assert.NoError(t, err)
-	assert.NoError(t, b.Run(context.Background()))
+	assert.NoError(t, b.Run(nil))
 	assert.EqualValues(t, []bool{true, true, true, false, false}, executor.Results)
 
 	assert.NoError(t, executor.Errors[0])
@@ -88,4 +88,24 @@ func TestButcherGeneratorError(t *testing.T) {
 	assert.NoError(t, err)
 	assert.EqualError(t, b.Run(context.Background()), "generator error occurred: boom")
 	assert.EqualValues(t, []bool{true, true, true, false, false}, executor.Results)
+}
+
+func TestButcherContextCancel(t *testing.T) {
+	size := 5
+	executor := &basicExecutor{
+		Size:    size,
+		Results: make([]bool, size),
+	}
+	b, err := NewButcher(executor, RateLimit(10))
+	assert.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		time.Sleep(150 * time.Millisecond)
+		cancel()
+	}()
+
+	err = b.Run(ctx)
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.EqualValues(t, []bool{true, true, false, false, false}, executor.Results)
 }

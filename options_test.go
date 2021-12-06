@@ -1,101 +1,208 @@
 package butcher
 
 import (
-	"reflect"
+	"os"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBufferSize(t *testing.T) {
-	type args struct {
-		size int
-	}
 	tests := []struct {
 		name   string
 		size   int
-		hasErr bool
+		errMsg string
 	}{
 		{
-			"valid size",
+			"ValidSize",
 			5,
-			false,
+			"",
 		},
 		{
-			"invalid size",
+			"InvalidSize",
 			0,
-			true,
+			"buffer size cannot be less than 0",
 		},
 		{
-			"invalid size 2",
+			"InvalidSize2",
 			-1,
-			true,
+			"buffer size cannot be less than 0",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b, err := NewButcher(nil, BufferSize(tt.size))
-			assert.Equal(t, err != nil, tt.hasErr)
-			assert.Equal(t, b == nil, tt.hasErr)
+			_, err := NewButcher(nil, BufferSize(tt.size))
+			if tt.errMsg == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.errMsg)
+			}
 		})
 	}
 }
 
 func TestMaxWorker(t *testing.T) {
-	type args struct {
-		count int
-	}
 	tests := []struct {
-		name string
-		args args
-		want Option
+		name   string
+		count  int
+		errMsg string
 	}{
-		// TODO: Add test cases.
+		{
+			"ValidCount",
+			5,
+			"",
+		},
+		{
+			"InvalidCount",
+			0,
+			"worker count cannot be less than 0",
+		},
+		{
+			"InvalidSize2",
+			-1,
+			"worker count cannot be less than 0",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := MaxWorker(tt.args.count); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("MaxWorker() = %v, want %v", got, tt.want)
+			_, err := NewButcher(nil, MaxWorker(tt.count))
+			if tt.errMsg == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.errMsg)
 			}
 		})
 	}
 }
 
 func TestRateLimit(t *testing.T) {
-	type args struct {
-		rateLimit float64
-	}
 	tests := []struct {
-		name string
-		args args
-		want Option
+		name      string
+		rateLimit float64
+		errMsg    string
 	}{
-		// TODO: Add test cases.
+		{
+			"ValidRate",
+			5,
+			"",
+		},
+		{
+			"InvalidRate",
+			0,
+			"rate cannot be less than 0",
+		},
+		{
+			"InvalidRate2",
+			-1,
+			"rate cannot be less than 0",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := RateLimit(tt.args.rateLimit); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("RateLimit() = %v, want %v", got, tt.want)
+			_, err := NewButcher(nil, RateLimit(tt.rateLimit))
+			if tt.errMsg == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.errMsg)
 			}
 		})
 	}
 }
 
 func TestRetryOnError(t *testing.T) {
-	type args struct {
-		maxTimes int
-	}
 	tests := []struct {
-		name string
-		args args
-		want Option
+		name     string
+		maxTimes int
+		errMsg   string
 	}{
-		// TODO: Add test cases.
+		{
+			"ValidTime",
+			5,
+			"",
+		},
+		{
+			"InvalidTime",
+			0,
+			"max retry times cannot be less than 0",
+		},
+		{
+			"InvalidTime2",
+			-1,
+			"max retry times cannot be less than 0",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := RetryOnError(tt.args.maxTimes); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("RetryOnError() = %v, want %v", got, tt.want)
+			_, err := NewButcher(nil, RetryOnError(tt.maxTimes))
+			if tt.errMsg == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.errMsg)
+			}
+		})
+	}
+}
+
+func TestTaskTimeout(t *testing.T) {
+	tests := []struct {
+		name    string
+		timeout time.Duration
+		errMsg  string
+	}{
+		{
+			"ValidTimeout",
+			5 * time.Second,
+			"",
+		},
+		{
+			"InvalidTimeout",
+			0,
+			"timeout cannot be less than 0",
+		},
+		{
+			"InvalidTimeout",
+			-1,
+			"timeout cannot be less than 0",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewButcher(nil, TaskTimeout(tt.timeout))
+			if tt.errMsg == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.errMsg)
+			}
+		})
+	}
+}
+
+func TestInterruptSignal(t *testing.T) {
+	tests := []struct {
+		name    string
+		signals []os.Signal
+		errMsg  string
+	}{
+		{
+			"ValidSignals",
+			[]os.Signal{syscall.SIGINT, syscall.SIGHUP},
+			"",
+		},
+		{
+			"EmptySignals",
+			[]os.Signal{},
+			"",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewButcher(nil, InterruptSignal(tt.signals...))
+			if tt.errMsg == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.errMsg)
 			}
 		})
 	}

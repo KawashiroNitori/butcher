@@ -3,10 +3,7 @@ package butcher
 import (
 	"context"
 	"fmt"
-	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 type basicExecutor struct {
@@ -28,11 +25,10 @@ func (b *basicExecutor) Task(ctx context.Context, job interface{}) error {
 }
 
 type retryExecutor struct {
-	T          *testing.T
-	Size       int
-	Results    []int
-	RetryTimes []int
-	Finished   []bool
+	Size     int
+	Results  []int
+	Finished []bool
+	Errors   []error
 }
 
 func (r *retryExecutor) GenerateJob(ctx context.Context, jobCh chan<- interface{}) error {
@@ -46,20 +42,18 @@ func (r *retryExecutor) Task(ctx context.Context, job interface{}) error {
 	i := job.(int)
 	r.Results[i]++
 	if v := r.Results[i]; v <= i {
-		panic(v)
+		panic(fmt.Errorf("boom"))
 	}
 	return nil
 }
 
-func (r *retryExecutor) OnError(ctx context.Context, retryTime int, job interface{}, err error) {
+func (r *retryExecutor) OnFinish(ctx context.Context, job interface{}, err error) {
 	i := job.(int)
-	assert.NotNil(r.T, err)
-	r.RetryTimes[i] = retryTime
-}
-
-func (r *retryExecutor) OnFinish(ctx context.Context, job interface{}) {
-	i := job.(int)
-	r.Finished[i] = true
+	if err == nil {
+		r.Finished[i] = true
+	} else {
+		r.Errors[i] = err
+	}
 }
 
 type taskTimeoutExecutor struct {
@@ -82,7 +76,7 @@ func (t *taskTimeoutExecutor) Task(ctx context.Context, job interface{}) error {
 	return nil
 }
 
-func (t *taskTimeoutExecutor) OnError(ctx context.Context, retryTime int, job interface{}, err error) {
+func (t *taskTimeoutExecutor) OnFinish(ctx context.Context, job interface{}, err error) {
 	i := job.(int)
 	t.Errors[i] = err
 }

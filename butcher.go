@@ -19,11 +19,12 @@ type Butcher interface {
 type butcher struct {
 	executor Executor
 
-	maxWorker     int
-	bufSize       int
-	maxRetryTimes int
-	rateLimit     rate.Limit
-	taskTimeout   time.Duration
+	maxWorker        int
+	bufSize          int
+	maxRetryTimes    int
+	rateLimit        rate.Limit
+	taskTimeout      time.Duration
+	interruptSignals []os.Signal
 
 	limiter *rate.Limiter
 
@@ -38,11 +39,12 @@ func NewButcher(executor Executor, opts ...Option) (Butcher, error) {
 	b := &butcher{
 		executor: executor,
 
-		maxWorker:     1,
-		bufSize:       1,
-		maxRetryTimes: 0,
-		rateLimit:     rate.Inf,
-		taskTimeout:   0,
+		maxWorker:        1,
+		bufSize:          1,
+		maxRetryTimes:    0,
+		rateLimit:        rate.Inf,
+		taskTimeout:      0,
+		interruptSignals: []os.Signal{syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT},
 	}
 	for _, opt := range opts {
 		if err := opt(b); err != nil {
@@ -66,21 +68,29 @@ func (b *butcher) Run(ctx context.Context) error {
 		ctx = context.Background()
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
 	b.generate(ctx)
 	b.rectify(ctx)
 	b.schedule(ctx)
 
-	signal.Notify(b.signalCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGTSTP, syscall.SIGQUIT)
+	if len(b.interruptSignals) > 0 {
+		signal.Notify(b.signalCh, b.interruptSignals...)
+	}
 	select {
+	case <-ctx.Done():
+		cancel()
+		return fmt.Errorf("interrupted by context: %w", ctx.Err())
 	case s := <-b.signalCh:
+		cancel()
+		<-b.completeCh
 		return fmt.Errorf("interrupted by signal: %v", s)
 	case err := <-b.generateErrCh:
 		// waiting for scheduled jobs complete
 		<-b.completeCh
+		cancel()
 		return fmt.Errorf("generator error occurred: %w", err)
 	case <-b.completeCh:
+		cancel()
 		return nil
 	}
 }
@@ -101,6 +111,12 @@ func (b *butcher) generate(ctx context.Context) {
 func (b *butcher) rectify(ctx context.Context) {
 	go func() {
 		for payload := range b.jobCh {
+			select {
+			case <-ctx.Done():
+				close(b.readyCh)
+				return
+			default:
+			}
 			_ = b.limiter.Wait(ctx)
 			b.readyCh <- job{Type: jobTypeJob, Payload: payload}
 		}
@@ -114,13 +130,20 @@ func (b *butcher) schedule(ctx context.Context) {
 	runFunc := func() {
 		defer wg.Done()
 		for j := range b.readyCh {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			var err error
 			for j.RetryTime <= b.maxRetryTimes {
-				if err := b.task(ctx, j); err != nil {
+				if err = b.task(ctx, j); err != nil {
 					j.RetryTime++
 				} else {
 					break
 				}
 			}
+			b.onFinish(ctx, j, err)
 		}
 	}
 
@@ -153,27 +176,13 @@ func (b *butcher) task(ctx context.Context, j job) (err error) {
 	case err = <-errCh:
 	}
 
-	if err != nil {
-		b.onError(ctx, j, err)
-	} else {
-		b.onFinish(ctx, j)
-	}
 	return err
 }
 
-func (b *butcher) onError(ctx context.Context, j job, err error) {
-	if watcher, ok := b.executor.(OnErrorWatcher); ok {
-		_ = safelyRun(func() error {
-			watcher.OnError(ctx, j.RetryTime, j.Payload, err)
-			return nil
-		})
-	}
-}
-
-func (b *butcher) onFinish(ctx context.Context, j job) {
+func (b *butcher) onFinish(ctx context.Context, j job, err error) {
 	if watcher, ok := b.executor.(OnFinishWatcher); ok {
 		_ = safelyRun(func() error {
-			watcher.OnFinish(ctx, j.Payload)
+			watcher.OnFinish(ctx, j.Payload, err)
 			return nil
 		})
 	}

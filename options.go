@@ -2,6 +2,7 @@ package butcher
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -55,6 +56,13 @@ func TaskTimeout(timeout time.Duration) Option {
 			return fmt.Errorf("timeout cannot be less than 0")
 		}
 		b.taskTimeout = timeout
+		return nil
+	}
+}
+
+func InterruptSignal(signals ...os.Signal) Option {
+	return func(b *butcher) error {
+		b.interruptSignals = signals
 		return nil
 	}
 }

@@ -8,9 +8,5 @@ type Executor interface {
 }
 
 type OnFinishWatcher interface {
-	OnFinish(ctx context.Context, job interface{})
-}
-
-type OnErrorWatcher interface {
-	OnError(ctx context.Context, retryTime int, job interface{}, err error)
+	OnFinish(ctx context.Context, job interface{}, err error)
 }

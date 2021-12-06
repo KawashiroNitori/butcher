@@ -1,5 +1,8 @@
 # butcher
-![example workflow](https://github.com/KawashiroNitori/butcher/actions/workflows/ci.yml/badge.svg)
+[![CI Build](https://github.com/KawashiroNitori/butcher/actions/workflows/ci.yml/badge.svg)](https://github.com/KawashiroNitori/butcher/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/KawashiroNitori/butcher.svg)](https://pkg.go.dev/github.com/KawashiroNitori/butcher)
+
+
 
 # Overview
 Butcher is a library providing a simple way to execute some task concurrency. Integrates convenient features such as concurrency control and retry.

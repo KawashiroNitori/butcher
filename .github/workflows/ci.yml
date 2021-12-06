@@ -55,5 +55,15 @@ jobs:
         run: go build -v ./...
 
       - name: Test
-        run: go test -v ./...
+        run: go test -v -coverprofile ./coverage.out ./...
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./
+          fail_ci_if_error: true
+          files: ./coverage.out
+          flags: unittests
+          verbose: true
 

@@ -2,8 +2,9 @@ package butcher
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSafelyRun(t *testing.T) {
@@ -40,6 +41,15 @@ func TestSafelyRun(t *testing.T) {
 				panic("wtf")
 			},
 			"unexpected panic occurred: wtf",
+		},
+		{
+			"PanicSliceIndexOut",
+			func() error {
+				a := make([]int64, 5)
+				a[len(a)]++
+				return nil
+			},
+			"runtime error: index out of range [5] with length 5",
 		},
 	}
 	for _, tt := range tests {

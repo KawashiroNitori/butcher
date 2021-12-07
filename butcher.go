@@ -35,6 +35,8 @@ type butcher struct {
 	signalCh      chan os.Signal
 }
 
+// NewButcher returns a butcher object for execute task executor. It has some options to control execute behaviors.
+// if no options given, it runs tasks serially.
 func NewButcher(executor Executor, opts ...Option) (Butcher, error) {
 	b := &butcher{
 		executor: executor,
@@ -63,6 +65,7 @@ func NewButcher(executor Executor, opts ...Option) (Butcher, error) {
 	return b, nil
 }
 
+// Run the task executor, return error if interrupted or GenerateJob return an error.
 func (b *butcher) Run(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -79,6 +82,7 @@ func (b *butcher) Run(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		cancel()
+		<-b.completeCh
 		return fmt.Errorf("interrupted by context: %w", ctx.Err())
 	case s := <-b.signalCh:
 		cancel()

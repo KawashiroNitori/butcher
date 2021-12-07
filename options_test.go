@@ -162,7 +162,7 @@ func TestTaskTimeout(t *testing.T) {
 			"timeout cannot be less than 0",
 		},
 		{
-			"InvalidTimeout",
+			"InvalidTimeout2",
 			-1,
 			"timeout cannot be less than 0",
 		},
@@ -193,6 +193,11 @@ func TestInterruptSignal(t *testing.T) {
 		{
 			"EmptySignals",
 			[]os.Signal{},
+			"",
+		},
+		{
+			"NilSignals",
+			nil,
 			"",
 		},
 	}

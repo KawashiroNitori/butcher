@@ -10,6 +10,7 @@ import (
 
 type Option func(b *butcher) error
 
+// MaxWorker specifies maximum number of concurrent workers, default is 1.
 func MaxWorker(count int) Option {
 	return func(b *butcher) error {
 		if count <= 0 {
@@ -20,6 +21,7 @@ func MaxWorker(count int) Option {
 	}
 }
 
+// RateLimit control task execute speed, default is Infinity.
 func RateLimit(tasksPerSecond float64) Option {
 	return func(b *butcher) error {
 		if tasksPerSecond <= 0 {
@@ -30,6 +32,7 @@ func RateLimit(tasksPerSecond float64) Option {
 	}
 }
 
+// BufferSize specifies job buffer size, recommended value is bigger than MaxWorker and RateLimit, default is 1.
 func BufferSize(size int) Option {
 	return func(b *butcher) error {
 		if size <= 0 {
@@ -40,6 +43,7 @@ func BufferSize(size int) Option {
 	}
 }
 
+// RetryOnError specifies retry times when task return error, default no retry.
 func RetryOnError(maxTimes int) Option {
 	return func(b *butcher) error {
 		if maxTimes <= 0 {
@@ -50,6 +54,7 @@ func RetryOnError(maxTimes int) Option {
 	}
 }
 
+// TaskTimeout specifies task execute timeout, returns a context.TimeExceeded error if timeout is exceeded, default no timeout.
 func TaskTimeout(timeout time.Duration) Option {
 	return func(b *butcher) error {
 		if timeout <= 0 {
@@ -60,6 +65,8 @@ func TaskTimeout(timeout time.Duration) Option {
 	}
 }
 
+// InterruptSignal specified signals can interrupt task running.
+// Default is syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT.
 func InterruptSignal(signals ...os.Signal) Option {
 	return func(b *butcher) error {
 		b.interruptSignals = signals

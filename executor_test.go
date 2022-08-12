@@ -11,15 +11,15 @@ type basicExecutor struct {
 	Results []bool
 }
 
-func (b *basicExecutor) GenerateJob(ctx context.Context, jobCh chan<- interface{}) error {
+func (b *basicExecutor) GenerateJob(ctx context.Context, jobCh chan<- int) error {
 	for i := 0; i < b.Size; i++ {
 		jobCh <- i
 	}
 	return nil
 }
 
-func (b *basicExecutor) Task(ctx context.Context, job interface{}) error {
-	i := job.(int)
+func (b *basicExecutor) Task(ctx context.Context, job int) error {
+	i := job
 	b.Results[i] = true
 	return nil
 }
@@ -31,15 +31,15 @@ type retryExecutor struct {
 	Errors   []error
 }
 
-func (r *retryExecutor) GenerateJob(ctx context.Context, jobCh chan<- interface{}) error {
+func (r *retryExecutor) GenerateJob(ctx context.Context, jobCh chan<- int) error {
 	for i := 0; i < r.Size; i++ {
 		jobCh <- i
 	}
 	return nil
 }
 
-func (r *retryExecutor) Task(ctx context.Context, job interface{}) error {
-	i := job.(int)
+func (r *retryExecutor) Task(ctx context.Context, job int) error {
+	i := job
 	r.Results[i]++
 	if v := r.Results[i]; v <= i {
 		panic(fmt.Errorf("boom"))
@@ -47,8 +47,8 @@ func (r *retryExecutor) Task(ctx context.Context, job interface{}) error {
 	return nil
 }
 
-func (r *retryExecutor) OnFinish(ctx context.Context, job interface{}, err error) {
-	i := job.(int)
+func (r *retryExecutor) OnFinish(ctx context.Context, job int, err error) {
+	i := job
 	if err == nil {
 		r.Finished[i] = true
 	} else {
@@ -62,22 +62,22 @@ type taskTimeoutExecutor struct {
 	Errors  []error
 }
 
-func (t *taskTimeoutExecutor) GenerateJob(ctx context.Context, jobCh chan<- interface{}) error {
+func (t *taskTimeoutExecutor) GenerateJob(ctx context.Context, jobCh chan<- int) error {
 	for i := 0; i < t.Size; i++ {
 		jobCh <- i
 	}
 	return nil
 }
 
-func (t *taskTimeoutExecutor) Task(ctx context.Context, job interface{}) error {
-	i := time.Duration(job.(int))
+func (t *taskTimeoutExecutor) Task(ctx context.Context, job int) error {
+	i := time.Duration(job)
 	time.Sleep(i * 100 * time.Millisecond)
 	t.Results[i] = true
 	return nil
 }
 
-func (t *taskTimeoutExecutor) OnFinish(ctx context.Context, job interface{}, err error) {
-	i := job.(int)
+func (t *taskTimeoutExecutor) OnFinish(ctx context.Context, job int, err error) {
+	i := job
 	t.Errors[i] = err
 }
 
@@ -86,7 +86,7 @@ type signalInterruptExecutor struct {
 	Results []bool
 }
 
-func (s *signalInterruptExecutor) GenerateJob(ctx context.Context, jobCh chan<- interface{}) error {
+func (s *signalInterruptExecutor) GenerateJob(ctx context.Context, jobCh chan<- int) error {
 	for i := 0; i < s.Size; i++ {
 		time.Sleep(100 * time.Millisecond)
 		jobCh <- i
@@ -94,8 +94,8 @@ func (s *signalInterruptExecutor) GenerateJob(ctx context.Context, jobCh chan<- 
 	return nil
 }
 
-func (s *signalInterruptExecutor) Task(ctx context.Context, job interface{}) error {
-	i := job.(int)
+func (s *signalInterruptExecutor) Task(ctx context.Context, job int) error {
+	i := job
 	s.Results[i] = true
 	return nil
 }
@@ -105,7 +105,7 @@ type generatorErrorExecutor struct {
 	Results []bool
 }
 
-func (g *generatorErrorExecutor) GenerateJob(ctx context.Context, jobCh chan<- interface{}) error {
+func (g *generatorErrorExecutor) GenerateJob(ctx context.Context, jobCh chan<- int) error {
 	for i := 0; i < g.Size; i++ {
 		if i >= 3 {
 			panic(fmt.Errorf("boom"))
@@ -115,8 +115,8 @@ func (g *generatorErrorExecutor) GenerateJob(ctx context.Context, jobCh chan<- i
 	return nil
 }
 
-func (g *generatorErrorExecutor) Task(ctx context.Context, job interface{}) error {
-	i := job.(int)
+func (g *generatorErrorExecutor) Task(ctx context.Context, job int) error {
+	i := job
 	g.Results[i] = true
 	return nil
 }

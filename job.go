@@ -7,8 +7,8 @@ const (
 	// jobTypeStop
 )
 
-type job struct {
+type job[T any] struct {
 	Type      jobType
 	RetryTime int
-	Payload   interface{}
+	Payload   T
 }

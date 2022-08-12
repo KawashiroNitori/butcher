@@ -33,7 +33,7 @@ func TestBufferSize(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewButcher(nil, BufferSize(tt.size))
+			_, err := NewButcher[any](nil, BufferSize(tt.size))
 			if tt.errMsg == "" {
 				assert.NoError(t, err)
 			} else {
@@ -67,7 +67,7 @@ func TestMaxWorker(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewButcher(nil, MaxWorker(tt.count))
+			_, err := NewButcher[any](nil, MaxWorker(tt.count))
 			if tt.errMsg == "" {
 				assert.NoError(t, err)
 			} else {
@@ -101,7 +101,7 @@ func TestRateLimit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewButcher(nil, RateLimit(tt.rateLimit))
+			_, err := NewButcher[any](nil, RateLimit(tt.rateLimit))
 			if tt.errMsg == "" {
 				assert.NoError(t, err)
 			} else {
@@ -135,7 +135,7 @@ func TestRetryOnError(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewButcher(nil, RetryOnError(tt.maxTimes))
+			_, err := NewButcher[any](nil, RetryOnError(tt.maxTimes))
 			if tt.errMsg == "" {
 				assert.NoError(t, err)
 			} else {
@@ -169,7 +169,7 @@ func TestTaskTimeout(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewButcher(nil, TaskTimeout(tt.timeout))
+			_, err := NewButcher[any](nil, TaskTimeout(tt.timeout))
 			if tt.errMsg == "" {
 				assert.NoError(t, err)
 			} else {
@@ -203,7 +203,7 @@ func TestInterruptSignal(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewButcher(nil, InterruptSignal(tt.signals...))
+			_, err := NewButcher[any](nil, InterruptSignal(tt.signals...))
 			if tt.errMsg == "" {
 				assert.NoError(t, err)
 			} else {

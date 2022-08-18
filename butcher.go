@@ -16,20 +16,23 @@ type Butcher interface {
 	Run(context.Context) error
 }
 
-type butcher struct {
-	executor Executor
-
+type butcherCfg struct {
 	maxWorker        int
 	bufSize          int
 	maxRetryTimes    int
 	rateLimit        rate.Limit
 	taskTimeout      time.Duration
 	interruptSignals []os.Signal
+}
+
+type butcher[T any] struct {
+	*butcherCfg
+	executor Executor[T]
 
 	limiter *rate.Limiter
 
-	jobCh         chan interface{}
-	readyCh       chan job
+	jobCh         chan T
+	readyCh       chan job[T]
 	generateErrCh chan error
 	completeCh    chan struct{}
 	signalCh      chan os.Signal
@@ -37,27 +40,28 @@ type butcher struct {
 
 // NewButcher returns a butcher object for execute task executor. It has some options to control execute behaviors.
 // if no options given, it runs tasks serially.
-func NewButcher(executor Executor, opts ...Option) (Butcher, error) {
-	b := &butcher{
+func NewButcher[T any](executor Executor[T], opts ...Option) (Butcher, error) {
+	b := &butcher[T]{
 		executor: executor,
-
-		maxWorker:        1,
-		bufSize:          1,
-		maxRetryTimes:    0,
-		rateLimit:        rate.Inf,
-		taskTimeout:      0,
-		interruptSignals: []os.Signal{syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT},
+		butcherCfg: &butcherCfg{
+			maxWorker:        1,
+			bufSize:          1,
+			maxRetryTimes:    0,
+			rateLimit:        rate.Inf,
+			taskTimeout:      0,
+			interruptSignals: []os.Signal{syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT},
+		},
 	}
 	for _, opt := range opts {
-		if err := opt(b); err != nil {
+		if err := opt(b.butcherCfg); err != nil {
 			return nil, err
 		}
 	}
 
 	b.limiter = rate.NewLimiter(b.rateLimit, b.bufSize)
 
-	b.jobCh = make(chan interface{}, b.bufSize)
-	b.readyCh = make(chan job, b.bufSize)
+	b.jobCh = make(chan T, b.bufSize)
+	b.readyCh = make(chan job[T], b.bufSize)
 	b.generateErrCh = make(chan error, 1)
 	b.completeCh = make(chan struct{}, 1)
 	b.signalCh = make(chan os.Signal, 1)
@@ -66,7 +70,7 @@ func NewButcher(executor Executor, opts ...Option) (Butcher, error) {
 }
 
 // Run the task executor, return error if interrupted or GenerateJob return an error.
-func (b *butcher) Run(ctx context.Context) error {
+func (b *butcher[T]) Run(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -99,7 +103,7 @@ func (b *butcher) Run(ctx context.Context) error {
 	}
 }
 
-func (b *butcher) generate(ctx context.Context) {
+func (b *butcher[T]) generate(ctx context.Context) {
 	go func() {
 		err := safelyRun(func() error {
 			err := b.executor.GenerateJob(ctx, b.jobCh)
@@ -112,7 +116,7 @@ func (b *butcher) generate(ctx context.Context) {
 	}()
 }
 
-func (b *butcher) rectify(ctx context.Context) {
+func (b *butcher[T]) rectify(ctx context.Context) {
 	go func() {
 		for payload := range b.jobCh {
 			select {
@@ -122,13 +126,13 @@ func (b *butcher) rectify(ctx context.Context) {
 			default:
 			}
 			_ = b.limiter.Wait(ctx)
-			b.readyCh <- job{Type: jobTypeJob, Payload: payload}
+			b.readyCh <- job[T]{Type: jobTypeJob, Payload: payload}
 		}
 		close(b.readyCh)
 	}()
 }
 
-func (b *butcher) schedule(ctx context.Context) {
+func (b *butcher[T]) schedule(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	runFunc := func() {
@@ -161,7 +165,7 @@ func (b *butcher) schedule(ctx context.Context) {
 	}()
 }
 
-func (b *butcher) task(ctx context.Context, j job) (err error) {
+func (b *butcher[T]) task(ctx context.Context, j job[T]) (err error) {
 	if b.taskTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, b.taskTimeout)
@@ -183,8 +187,8 @@ func (b *butcher) task(ctx context.Context, j job) (err error) {
 	return err
 }
 
-func (b *butcher) onFinish(ctx context.Context, j job, err error) {
-	if watcher, ok := b.executor.(OnFinishWatcher); ok {
+func (b *butcher[T]) onFinish(ctx context.Context, j job[T], err error) {
+	if watcher, ok := b.executor.(OnFinishWatcher[T]); ok {
 		_ = safelyRun(func() error {
 			watcher.OnFinish(ctx, j.Payload, err)
 			return nil

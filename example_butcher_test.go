@@ -10,7 +10,7 @@ import (
 func Example_newButcher_Options() {
 	ctx := context.Background()
 	executor := &basicExecutor{}
-	b, err := NewButcher(
+	b, err := NewButcher[int](
 		executor,
 		MaxWorker(3),               // specifies maximum number of concurrent workers, default is 1.
 		BufferSize(20),             // specifies job buffer size, recommended value is bigger than MaxWorker and RateLimit, default is 1.

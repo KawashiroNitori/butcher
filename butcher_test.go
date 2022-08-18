@@ -16,7 +16,7 @@ func TestButcherBasic(t *testing.T) {
 		Size:    size,
 		Results: make([]bool, size),
 	}
-	b, err := NewButcher(executor, MaxWorker(3), BufferSize(1))
+	b, err := NewButcher[int](executor, MaxWorker(3), BufferSize(1))
 	expected := make([]bool, size)
 	for i := range expected {
 		expected[i] = true
@@ -34,7 +34,7 @@ func TestButcherRetry(t *testing.T) {
 		Finished: make([]bool, size),
 		Errors:   make([]error, size),
 	}
-	b, err := NewButcher(executor, MaxWorker(3), BufferSize(3), RetryOnError(3))
+	b, err := NewButcher[int](executor, MaxWorker(3), BufferSize(3), RetryOnError(3))
 	assert.NoError(t, err)
 	assert.NoError(t, b.Run(context.Background()))
 	assert.EqualValues(t, []int{1, 2, 3, 4, 4, 4}, executor.Results)
@@ -49,7 +49,7 @@ func TestButcherTaskTimeout(t *testing.T) {
 		Errors:  make([]error, size),
 		Results: make([]bool, size),
 	}
-	b, err := NewButcher(executor, MaxWorker(5), BufferSize(5), TaskTimeout(250*time.Millisecond))
+	b, err := NewButcher[int](executor, MaxWorker(5), BufferSize(5), TaskTimeout(250*time.Millisecond))
 	assert.NoError(t, err)
 	assert.NoError(t, b.Run(nil))
 	assert.EqualValues(t, []bool{true, true, true, false, false}, executor.Results)
@@ -67,8 +67,8 @@ func TestButcherInterruptedBySignal(t *testing.T) {
 		Size:    size,
 		Results: make([]bool, size),
 	}
-	bb, err := NewButcher(executor, MaxWorker(5), BufferSize(5))
-	b := bb.(*butcher)
+	bb, err := NewButcher[int](executor, MaxWorker(5), BufferSize(5))
+	b := bb.(*butcher[int])
 	assert.NoError(t, err)
 	go func() {
 		time.Sleep(250 * time.Millisecond)
@@ -84,7 +84,7 @@ func TestButcherGeneratorError(t *testing.T) {
 		Size:    size,
 		Results: make([]bool, size),
 	}
-	b, err := NewButcher(executor, MaxWorker(3), BufferSize(3))
+	b, err := NewButcher[int](executor, MaxWorker(3), BufferSize(3))
 	assert.NoError(t, err)
 	assert.EqualError(t, b.Run(context.Background()), "generator error occurred: boom")
 	assert.EqualValues(t, []bool{true, true, true, false, false}, executor.Results)
@@ -96,7 +96,7 @@ func TestButcherContextCancel(t *testing.T) {
 		Size:    size,
 		Results: make([]bool, size),
 	}
-	b, err := NewButcher(executor, RateLimit(10))
+	b, err := NewButcher[int](executor, RateLimit(10))
 	assert.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
 

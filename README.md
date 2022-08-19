@@ -20,7 +20,7 @@ import (
 
 type executor struct{}
 
-func (e *executor) GenerateJob(ctx context.Context, jobCh chan<- interface{}) error {
+func (e *executor) GenerateJob(ctx context.Context, jobCh chan<- int) error {
     // generate your jobs here
     for i := 0; i < 100; i++ {
         // you can check canceled context or not, is up to you
@@ -29,7 +29,7 @@ func (e *executor) GenerateJob(ctx context.Context, jobCh chan<- interface{}) er
             return nil
         default:
         }
-        
+
         // push your job into channel
         jobCh <- i
     }
@@ -37,14 +37,14 @@ func (e *executor) GenerateJob(ctx context.Context, jobCh chan<- interface{}) er
     return nil
 }
 
-func (e *executor) Task(ctx context.Context, job interface{}) error {
+func (e *executor) Task(ctx context.Context, job int) error {
     // execute your job here
     fmt.Printf("job %v finished!\n", job)
     return nil
 }
 
 // OnFinish implement an optional func to check your job is finished if you want
-func (e *executor) OnFinish(ctx context.Context, job interface{}, err error) {
+func (e *executor) OnFinish(ctx context.Context, job int, err error) {
     if err != nil {
         fmt.Println("job %v error: %v", job, err)
     }
@@ -52,11 +52,11 @@ func (e *executor) OnFinish(ctx context.Context, job interface{}, err error) {
 
 func main() {
     ctx := context.Background()
-    b, err := butcher.NewButcher(&executor{})  // you can add some options here
+    b, err := butcher.NewButcher[int](&executor{})  // you can add some options here
     if err != nil {
         panic(err)
     }
-    
+
     err = b.Run(ctx)
     if err != nil {
         panic(err)

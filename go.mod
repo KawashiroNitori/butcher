@@ -1,4 +1,4 @@
-module github.com/KawashiroNitori/butcher
+module github.com/KawashiroNitori/butcher/v2
 
 go 1.18
 

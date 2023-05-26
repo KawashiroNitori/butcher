@@ -171,7 +171,7 @@ func (b *butcher[T]) task(ctx context.Context, j job[T]) (err error) {
 		ctx, cancel = context.WithTimeout(ctx, b.taskTimeout)
 		defer cancel()
 	}
-	errCh := make(chan error)
+	errCh := make(chan error, 1)
 	go func() {
 		errCh <- safelyRun(func() error {
 			return b.executor.Task(ctx, j.Payload)

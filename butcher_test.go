@@ -3,6 +3,7 @@ package butcher
 import (
 	"context"
 	"fmt"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -108,4 +109,28 @@ func TestButcherContextCancel(t *testing.T) {
 	err = b.Run(ctx)
 	assert.ErrorIs(t, err, context.Canceled)
 	assert.EqualValues(t, []bool{true, true, false, false, false}, executor.Results)
+}
+
+func TestButcherFunc(t *testing.T) {
+	var sum int
+	var lock sync.Mutex
+
+	executor := NewFuncExecutor(
+		func(ctx context.Context, jobCh chan<- int) error {
+			for i := 1; i <= 100; i++ {
+				jobCh <- i
+			}
+			return nil
+		}, func(ctx context.Context, job int) error {
+			lock.Lock()
+			defer lock.Unlock()
+			sum += job
+			return nil
+		},
+	)
+
+	b, err := NewButcher(executor, MaxWorker(3), BufferSize(1))
+	assert.NoError(t, err)
+	assert.NoError(t, b.Run(context.Background()))
+	assert.EqualValues(t, 5050, sum)
 }

@@ -46,7 +46,7 @@ func (e *executor) Task(ctx context.Context, job int) error {
 // OnFinish implement an optional func to check your job is finished if you want
 func (e *executor) OnFinish(ctx context.Context, job int, err error) {
     if err != nil {
-        fmt.Println("job %v error: %v", job, err)
+        fmt.Printf("job %v error: %v", job, err)
     }
 }
 
